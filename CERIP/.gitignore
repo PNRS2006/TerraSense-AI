@@ -1,0 +1,73 @@
+# ============================================================
+# CERIP — .gitignore
+# ============================================================
+
+# --- Python Bytecode & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# --- Environments & Secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Testing & Code Quality ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- IDEs & Editors ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# --- OS Generated Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# --- Logs & Runtime Temp Files ---
+*.log
+*.tmp
+*.bak
+scratch/
+
+# --- Streamlit Secrets ---
+.streamlit/secrets.toml
+
+# --- Jupyter Notebook Checkpoints ---
+.ipynb_checkpoints/
+
+# --- Large Downloaded Satellite/Raw Geotiffs (keep processed sample data) ---
+data/raw/*.tif
+data/raw/*.tiff
+data/raw/*.nc
+data/raw/*.hdf
+data/raw/*.tar.gz
+data/raw/*.zip
