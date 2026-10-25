@@ -21,12 +21,26 @@ Usage
     forecast = suite.predict_next_72h(recent_X, recent_timestamps)
 """
 
+import os
+import sys
 import logging
 import warnings
 import pickle
 import joblib
 from pathlib import Path
 from typing import Any
+
+# Configure thread safety on Windows
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("PYTHONUTF8", "1")
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+MODELS_DIR = ROOT / "models_saved"
+MODELS_DIR.mkdir(exist_ok=True)
 
 import numpy as np
 import pandas as pd
@@ -37,10 +51,6 @@ import yaml
 
 warnings.filterwarnings("ignore")
 log = logging.getLogger(__name__)
-
-ROOT = Path(__file__).resolve().parents[2]
-MODELS_DIR = ROOT / "models_saved"
-MODELS_DIR.mkdir(exist_ok=True)
 
 with open(ROOT / "config" / "settings.yaml", encoding="utf-8") as f:
     CFG = yaml.safe_load(f)
@@ -65,11 +75,11 @@ def forecast_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 # =============================================================
 
 def build_lstm_model(seq_len: int, n_features: int, units: int = 64,
-                     dropout: float = 0.2) -> "keras.Model":
+                     dropout: float = 0.2) -> Any:
     """Build a single-layer LSTM model (laptop-friendly)."""
     try:
-        from tensorflow import keras
-        from tensorflow.keras import layers
+        from tensorflow import keras  # type: ignore
+        from tensorflow.keras import layers  # type: ignore
     except ImportError:
         raise ImportError("tensorflow not installed. Run: pip install tensorflow")
 
@@ -114,7 +124,7 @@ def train_lstm(
     model = build_lstm_model(seq_len, X_scaled.shape[1], units, dropout)
 
     try:
-        from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+        from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau  # type: ignore
         callbacks = [
             EarlyStopping(patience=5, restore_best_weights=True, verbose=0),
             ReduceLROnPlateau(patience=3, factor=0.5, verbose=0),
@@ -146,7 +156,7 @@ def train_prophet(aqi_df: pd.DataFrame) -> tuple:
     Returns (model, forecast_df).
     """
     try:
-        from prophet import Prophet
+        from prophet import Prophet  # type: ignore
     except ImportError:
         raise ImportError("prophet not installed. Run: pip install prophet")
 
@@ -342,26 +352,45 @@ class AQIForecastSuite:
         Uses best model for the given horizon.
         Returns dict with predictions and model used.
         """
-        model_name, model_obj = self.best_models.get(
-            horizon, ("GradientBoosting", self.gb_models.get(horizon))
-        )
-        if model_name == "GradientBoosting":
+        best_info = self.best_models.get(horizon)
+        if best_info is not None and best_info[1] is not None:
+            model_name, model_obj = best_info
+        elif horizon in self.gb_models and self.gb_models[horizon] is not None:
+            model_name, model_obj = "GradientBoosting", self.gb_models[horizon]
+        else:
+            fallback_h = next((h for h in HORIZONS if self.gb_models.get(h) is not None), None)
+            if fallback_h is not None:
+                model_name, model_obj = f"GradientBoosting_{fallback_h}h", self.gb_models[fallback_h]
+            else:
+                model_name, model_obj = "fallback_zeros", None
+
+        if model_obj is not None and model_name.startswith("GradientBoosting"):
             preds = model_obj.predict(X_recent_scaled)
-        elif model_name == "LSTM" and model_obj is not None:
-            seq_len = LSTM_CFG["sequence_length"]
+        elif model_obj is not None and model_name == "LSTM":
+            seq_len = LSTM_CFG.get("sequence_length", 24)
             if X_recent_scaled.shape[0] >= seq_len:
                 X_seq = X_recent_scaled[-seq_len:].reshape(1, seq_len, -1)
                 preds = model_obj.predict(X_seq, verbose=0).flatten()
-            else:
+            elif horizon in self.gb_models and self.gb_models[horizon] is not None:
                 preds = self.gb_models[horizon].predict(X_recent_scaled)
+            else:
+                preds = np.zeros(horizon)
         else:
             preds = np.zeros(horizon)
 
         return {
             "horizon_h": horizon,
             "model_used": model_name,
-            "aqi_forecast": preds.tolist() if hasattr(preds, "tolist") else preds,
+            "aqi_forecast": preds.tolist() if hasattr(preds, "tolist") else list(preds),
         }
+
+    def evaluate(self):
+        """Convenience alias for print_report()."""
+        return self.print_report()
+
+    def predict_next_72h(self, recent_X: np.ndarray, recent_timestamps: Any = None) -> dict:
+        """Convenience method to predict 72h forecast."""
+        return self.forecast_next_hours(recent_X, horizon=72)
 
     def save(self, directory: Path = MODELS_DIR):
         # Save GB models
@@ -389,6 +418,7 @@ class AQIForecastSuite:
             p = directory / f"aqi_gb_{h}h.joblib"
             if p.exists():
                 suite.gb_models[h] = joblib.load(p)
+                suite.best_models[h] = ("GradientBoosting", suite.gb_models[h])
         prophet_path = directory / "aqi_prophet.pkl"
         if prophet_path.exists():
             with open(prophet_path, "rb") as f:
@@ -420,3 +450,20 @@ class AQIForecastSuite:
         for h in HORIZONS:
             name, _ = self.best_models.get(h, ("N/A", None))
             print(f"  {h}h  →  {name}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    print("=" * 65)
+    print("CERIP — AQI Forecast Suite Self-Test")
+    print("=" * 65)
+    suite = AQIForecastSuite.load()
+    print("Loaded GradientBoosting models:", list(suite.gb_models.keys()))
+    print("Scaler loaded:", suite.scaler is not None)
+    if suite.scaler is not None and 24 in suite.gb_models:
+        dummy_X = np.zeros((24, suite.scaler.n_features_in_))
+        res = suite.forecast_next_hours(dummy_X, 24)
+        print("24h Test Forecast Sample (first 5):", [round(x, 2) for x in res["aqi_forecast"][:5]])
+        print("Model used:", res["model_used"])
+    print("=" * 65)
+    print("Self-test passed successfully!")

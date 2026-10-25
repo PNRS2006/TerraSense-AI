@@ -69,13 +69,20 @@ def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 
 def classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    risk_labels = CFG["heat_risk"]["risk_labels"]
+    expected_classes = sorted(risk_labels.keys())
+    target_names = [risk_labels[i] for i in expected_classes]
+
     acc  = accuracy_score(y_true, y_pred)
-    f1_w = f1_score(y_true, y_pred, average="weighted")
-    f1_m = f1_score(y_true, y_pred, average="macro")
-    cm   = confusion_matrix(y_true, y_pred)
-    rpt  = classification_report(y_true, y_pred,
-                                  target_names=[CFG["heat_risk"]["risk_labels"][i]
-                                                for i in sorted(CFG["heat_risk"]["risk_labels"])])
+    f1_w = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1_m = f1_score(y_true, y_pred, average="macro", zero_division=0)
+    cm   = confusion_matrix(y_true, y_pred, labels=expected_classes)
+    rpt  = classification_report(
+        y_true, y_pred,
+        labels=expected_classes,
+        target_names=target_names,
+        zero_division=0,
+    )
     return {
         "Accuracy":  round(acc, 4),
         "F1_weighted": round(f1_w, 4),

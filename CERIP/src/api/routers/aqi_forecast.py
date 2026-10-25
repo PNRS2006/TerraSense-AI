@@ -3,11 +3,13 @@ CERIP — AQI Forecast Router
 GET  /aqi-forecast?horizon_hours=24|48|72
 """
 
+import logging
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Query, HTTPException
 from src.api.schemas import AQIForecastResponse, HourlyAQIPoint
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 AQI_CATEGORY_MAP = {
@@ -87,7 +89,8 @@ async def get_aqi_forecast(
             rmse_val = m.get("RMSE")
         else:
             raise ValueError("No AQI suite")
-    except Exception:
+    except Exception as e:
+        log.warning("Model forecast exception (%s); using trend fallback.", e)
         # Fallback: simple trend from recent data
         recent = aqi_df["aqi"].tail(72).values
         noise  = np.random.default_rng(42).normal(0, 5, horizon_hours)
