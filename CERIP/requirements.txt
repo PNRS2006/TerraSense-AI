@@ -1,0 +1,51 @@
+# ============================================================
+# CERIP — requirements.txt
+# Python 3.10+  |  CPU-runnable on a normal laptop
+# ============================================================
+
+# --- Core data science ---
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# --- Geospatial ---
+geopandas>=0.13.0
+rasterio>=1.3.0
+shapely>=2.0.0
+pyproj>=3.5.0
+folium>=0.14.0
+
+# --- Machine learning ---
+scikit-learn>=1.3.0
+xgboost>=1.7.0
+lightgbm>=4.0.0
+joblib>=1.3.0
+
+# --- Deep learning (CPU) ---
+tensorflow>=2.13.0
+
+# --- Time-series forecasting ---
+prophet>=1.1.4
+
+# --- Explainability ---
+shap>=0.42.0
+
+# --- Visualization ---
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# --- API ---
+fastapi>=0.103.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+
+# --- Dashboard ---
+streamlit>=1.28.0
+streamlit-folium>=0.15.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0
+PyYAML>=6.0.0
+requests>=2.31.0
+tqdm>=4.65.0

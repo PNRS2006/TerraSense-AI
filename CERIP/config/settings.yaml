@@ -1,0 +1,161 @@
+# ============================================================
+# CERIP — config/settings.yaml
+# All configurable thresholds, weights, and city parameters
+# ============================================================
+
+city:
+  name: "Visakhapatnam"
+  country: "India"
+  pilot_note: "Pilot city per project specification"
+
+  # Bounding box in WGS84 (lon_min, lat_min, lon_max, lat_max)
+  bbox:
+    lon_min: 83.15
+    lat_min: 17.60
+    lon_max: 83.45
+    lat_max: 17.85
+
+  # UTM Zone 44N for metric calculations
+  projected_crs: "EPSG:32644"
+  geographic_crs: "EPSG:4326"
+
+  # 500m x 500m grid (as specified)
+  grid_cell_size_m: 500
+
+# ============================================================
+# Module A — Heat Risk
+# ============================================================
+heat_risk:
+  # Regression output: continuous LST (°C)
+  # Classification output: 1=Very Low … 5=Very High
+  risk_labels:
+    1: "Very Low"
+    2: "Low"
+    3: "Moderate"
+    4: "High"
+    5: "Very High"
+
+  # LST thresholds (°C) for classification bins
+  lst_thresholds: [30.0, 34.0, 37.0, 40.0]  # edges of 5 bins
+
+  # Heat score mapping for UOSI (1-5 → 0-4 numeric)
+  heat_score_map:
+    1: 0    # Very Low
+    2: 1    # Low
+    3: 2    # Moderate
+    4: 3    # High
+    5: 4    # Very High
+
+# ============================================================
+# Module B — Air Quality
+# ============================================================
+air_quality:
+  # AQI category definitions (CPCB / US EPA adapted)
+  aqi_categories:
+    good:                  {min: 0,   max: 50,  label: "Good",                score: 0}
+    moderate:              {min: 51,  max: 100, label: "Moderate",            score: 1}
+    unhealthy_sensitive:   {min: 101, max: 150, label: "Unhealthy-Sensitive", score: 2}
+    unhealthy:             {min: 151, max: 200, label: "Unhealthy",           score: 3}
+    very_unhealthy:        {min: 201, max: 300, label: "Very Unhealthy",      score: 4}
+    hazardous:             {min: 301, max: 999, label: "Hazardous",           score: 4}
+
+  # Forecast horizons (hours)
+  forecast_horizons: [24, 48, 72]
+  default_horizon: 24
+
+  # Activity types supported
+  activity_types:
+    - "Running"
+    - "Walking"
+    - "Cycling"
+    - "Outdoor Yoga"
+    - "Construction Work"
+    - "Elderly Stroll"
+
+  # User sensitivity profiles
+  sensitivity_profiles:
+    - "Healthy Adult"
+    - "Child"
+    - "Elderly"
+    - "Respiratory Patient"
+    - "Cardiac Patient"
+
+  # AQI guidance by sensitivity (max safe AQI before warning)
+  aqi_guidance:
+    healthy_adult:        {caution: 100, avoid: 200}
+    child:                {caution: 50,  avoid: 150}
+    elderly:              {caution: 50,  avoid: 150}
+    respiratory_patient:  {caution: 50,  avoid: 100}
+    cardiac_patient:      {caution: 50,  avoid: 100}
+
+# ============================================================
+# Unified Outdoor Safety Index (UOSI)
+# ============================================================
+unified_index:
+  # Weights must sum to 1.0
+  w_heat: 0.50
+  w_aqi:  0.50
+
+  # Compounding-risk bonus applied when BOTH scores >= threshold
+  compound_threshold: 3       # heat_score AND aqi_score must be >= this
+  compound_bonus: 0.50        # added to raw UOSI when compounding applies
+
+  # Final category thresholds (applied to UOSI_raw)
+  thresholds:
+    safe:    {min: 0.0,  max: 1.5,  label: "Safe",    color: "#2ecc71", emoji: "✅"}
+    caution: {min: 1.5,  max: 2.5,  label: "Caution", color: "#f39c12", emoji: "⚠️"}
+    limit:   {min: 2.5,  max: 3.5,  label: "Limit",   color: "#e67e22", emoji: "🚫"}
+    avoid:   {min: 3.5,  max: 99.0, label: "Avoid",   color: "#e74c3c", emoji: "☠️"}
+
+# ============================================================
+# Model training parameters
+# ============================================================
+models:
+  random_forest:
+    n_estimators: 200
+    max_depth: 12
+    random_state: 42
+    n_jobs: -1
+
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    random_state: 42
+
+  lightgbm:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    random_state: 42
+    verbose: -1
+
+  lstm:
+    units: 64          # Single layer, 64 units (laptop-friendly)
+    dropout: 0.2
+    epochs: 30
+    batch_size: 32
+    sequence_length: 24  # 24-hour lookback window
+
+  gradient_boosting:   # sklearn GB for AQI baseline
+    n_estimators: 200
+    max_depth: 4
+    learning_rate: 0.05
+    random_state: 42
+
+# ============================================================
+# SHAP settings
+# ============================================================
+shap:
+  max_display_features: 15
+  background_sample_size: 100   # for SHAP KernelExplainer background
+
+# ============================================================
+# Synthetic data generation parameters
+# ============================================================
+synthetic:
+  random_seed: 42
+  n_grid_cells: 1800            # ~1800 cells for Vizag at 500m resolution
+  aqi_timeseries_days: 730      # 2 years of hourly AQI data
+  add_seasonal_patterns: true
+  add_spatial_autocorrelation: true
